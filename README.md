@@ -66,7 +66,9 @@ Install the included Chrome extension once:
 3. Choose **Load unpacked** and select this repository's `browser-companion` directory.
 4. Keep the extension enabled. After pulling an update, use Chrome's reload button for the extension.
 
-While a widget is open, the extension checks every minute and opens `claude.ai/settings/usage` in a minimized popup, reads the visible limit cards, sends the percentages and reset text to the local widget, then closes the popup. It does not refresh Claude when the widget is closed.
+At widget launch, both providers refresh once. For the next 30 seconds, all periodic refreshes are suppressed so launch cannot cause duplicate work. After that quiet period, Claude refreshes every 30 seconds and ChatGPT/Codex every minute through their signed-in browser usage pages. The desktop Codex app is no longer opened or automated. The widget intentionally does not refresh on hover or model selection. Each browser page opens in an off-screen popup, sends the percentage and reset text to the local widget, then closes. If the window manager refuses off-screen placement, the extension immediately minimizes it instead. It does not refresh either provider when the widget is closed.
+
+After updating this repository, go to `chrome://extensions` and click the extension's **Reload** button once. The new instant-Claude refresh uses Chrome's local offscreen extension page, so reload is required for a previously installed extension.
 
 ## Privacy
 

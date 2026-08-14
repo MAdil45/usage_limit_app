@@ -15,7 +15,7 @@ function resetAfter(text, anchor) {
   const at = text.toLowerCase().indexOf(anchor.toLowerCase());
   if (at < 0) return null;
   const slice = text.slice(at, at + 500);
-  const match = slice.match(/Resets?\s+(?:in\s+)?(.+?)(?=\s+\d+(?:\.\d+)?%|\s+(?:Usage limit resets|Last updated|Usage credits)|$)/i);
+  const match = slice.match(/Resets?\s+(?:in\s+)?(.+?)(?=\s+\d+(?:\.\d+)?%|\s+(?:Usage limit resets|Last updated|Usage credits|Credits remaining|Auto reload|Usage breakdown|Personal usage)|$)/i);
   return match ? `Resets ${match[1].trim()}` : null;
 }
 function extractClaude(text) {
@@ -26,9 +26,10 @@ function extractClaude(text) {
   }};
 }
 function extractChatGPT(text) {
-  if (!/Weekly usage limit|General usage limits/i.test(text)) return null;
+  const anchor = /Weekly usage limit/i.test(text) ? "Weekly usage limit" : /Weekly limit/i.test(text) ? "Weekly limit" : null;
+  if (!anchor) return null;
   return { provider: "ChatGPT", windows: { "Weekly": {
-    used: percentAfter(text, "Weekly usage limit"), reset_label: resetAfter(text, "Weekly usage limit")
+    used: percentAfter(text, anchor), reset_label: resetAfter(text, anchor)
   }}};
 }
 function publish() {

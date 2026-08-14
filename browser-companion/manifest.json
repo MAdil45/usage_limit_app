@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "AI Usage Widget Companion",
-  "version": "0.2.1",
+  "version": "0.3.2",
   "description": "Locally syncs visible ChatGPT and Claude usage limits to the desktop widget.",
-  "permissions": ["storage", "tabs", "alarms", "windows"],
+  "permissions": ["storage", "tabs", "alarms", "windows", "offscreen"],
   "background": {"service_worker": "background.js"},
   "host_permissions": ["https://claude.ai/*", "https://chatgpt.com/*", "https://codex.com/*", "http://127.0.0.1:8765/*"],
   "content_scripts": [{"matches": ["https://claude.ai/*", "https://chatgpt.com/*", "https://codex.com/*"], "js": ["content.js"], "run_at": "document_idle"}]

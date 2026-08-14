@@ -38,28 +38,33 @@ def find_usage_menu_y(path):
 def sync():
     previous = run("xdotool", "getactivewindow", check=False)
     codex = visible_codex_window()
-    with tempfile.TemporaryDirectory() as tmp:
-        menu = f"{tmp}/menu.png"; page = f"{tmp}/page.png"
-        run("xdotool", "windowactivate", "--sync", codex); run("xdotool", "key", "ctrl+comma"); time.sleep(1.4)
-        capture(codex, menu)
-        y = find_usage_menu_y(menu)
-        if y is None: raise RuntimeError("Could not locate Usage & billing in Codex Settings")
-        geometry = dict(item.split("=", 1) for item in run("xdotool", "getwindowgeometry", "--shell", codex).splitlines() if "=" in item)
-        run("xdotool", "mousemove", str(int(geometry["X"]) + 112), str(int(geometry["Y"]) + y)); run("xdotool", "click", "1"); time.sleep(1.6)
-        capture(codex, page); text = ocr(page)
-    match = re.search(r"(\d{1,3})\s*%\s*(?:left|remaining)", text, re.I)
-    reset = re.search(r"Resets?\s+([^\n]+)", text, re.I)
-    if not match: raise RuntimeError("Could not read Codex weekly usage from Usage & billing")
-    used = 100 - int(match.group(1))
-    data = json.loads(STATE.read_text())
-    weekly = data["providers"]["ChatGPT"]["Weekly"]
-    weekly["used"], weekly["remaining"] = used, 100 - used
-    if reset: weekly["reset_label"] = f"Resets {reset.group(1).strip()}"
-    weekly["updated_at"] = datetime.now(timezone.utc).isoformat()
-    STATE.write_text(json.dumps(data, indent=2))
-    run("xdotool", "key", "Escape", check=False)
-    if previous: run("xdotool", "windowactivate", "--sync", previous, check=False)
-    print(f"Codex synced: {used}% used")
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            menu = f"{tmp}/menu.png"; page = f"{tmp}/page.png"
+            # `windowfocus` changes input focus without asking the window
+            # manager to raise or activate Codex, so it stays behind the
+            # user's current app while Electron accepts the keyboard shortcut.
+            run("xdotool", "windowfocus", "--sync", codex)
+            run("xdotool", "key", "ctrl+comma"); time.sleep(1.4)
+            capture(codex, menu)
+            y = find_usage_menu_y(menu)
+            if y is None: raise RuntimeError("Could not locate Usage & billing in Codex Settings")
+            run("xdotool", "mousemove", "--window", codex, "112", str(y)); run("xdotool", "click", "--window", codex, "1"); time.sleep(1.6)
+            capture(codex, page); text = ocr(page)
+        match = re.search(r"(\d{1,3})\s*%\s*(?:left|remaining)", text, re.I)
+        reset = re.search(r"Resets?\s+([^\n]+)", text, re.I)
+        if not match: raise RuntimeError("Could not read Codex weekly usage from Usage & billing")
+        used = 100 - int(match.group(1))
+        data = json.loads(STATE.read_text())
+        weekly = data["providers"]["ChatGPT"]["Weekly"]
+        weekly["used"], weekly["remaining"] = used, 100 - used
+        if reset: weekly["reset_label"] = f"Resets {reset.group(1).strip()}"
+        weekly["updated_at"] = datetime.now(timezone.utc).isoformat()
+        STATE.write_text(json.dumps(data, indent=2))
+        print(f"Codex synced: {used}% used")
+    finally:
+        run("xdotool", "key", "Escape", check=False)
+        if previous: run("xdotool", "windowfocus", "--sync", previous, check=False)
 
 if __name__ == "__main__":
     parser=argparse.ArgumentParser(); parser.add_argument("--interval", type=int, default=600); parser.add_argument("--once", action="store_true"); args=parser.parse_args()
