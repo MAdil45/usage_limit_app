@@ -74,12 +74,3 @@ No passwords, cookies, API keys, prompts, chats, or account identifiers are save
 
 The site interfaces can change. If Claude or Codex redesigns its usage screen, the text/OCR parsing may need an update.
 
-## Glass idle opacity
-
-Only the Glass design fades while idle. To choose the background strength, edit this setting in `webview_widget.py` and restart the Glass widget:
-
-```python
-GLASS_IDLE_OPACITY = 0.35
-```
-
-`0.0` is almost invisible; `1.0` is fully opaque. This setting changes only the Glass background layer, not its text or controls.
