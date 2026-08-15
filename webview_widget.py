@@ -68,7 +68,7 @@ def html(theme):
     shape = 'aurora' if aurora else 'glass'
     page = f'''<!doctype html><html><head><meta charset="utf-8"><style>
 *{{box-sizing:border-box}} html,body{{margin:0;width:100%;height:100%;background:transparent;overflow:hidden;font-family:Inter,Ubuntu,Arial,sans-serif;color:#f8fbff;user-select:none}}
-body{{display:flex;align-items:center;justify-content:center}} .shell{{position:relative;width:calc(100% - 36px);height:calc(100% - 40px);min-width:330px;min-height:460px;overflow:hidden;background:rgba(14,25,72,.76);border:0;box-shadow:0 22px 70px rgba(4,7,35,.55);backdrop-filter:blur(30px) saturate(145%)}}
+body{{display:flex;align-items:center;justify-content:center}} .shell{{position:relative;width:calc(100% - 36px);height:calc(100% - 40px);min-width:330px;min-height:460px;overflow:hidden;background:rgba(14,25,72,.76);border:0;box-shadow:none;backdrop-filter:blur(30px) saturate(145%)}}
 .glass{{border-radius:58px;background:transparent;--glass-idle:{GLASS_IDLE_OPACITY};}} .glass::before{{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:linear-gradient(150deg,rgba(151,185,228,.58),rgba(55,83,142,.46) 55%,rgba(133,105,192,.5));opacity:var(--glass-idle);transition:opacity .28s ease-in-out;}} .glass:hover::before,.glass:focus-within::before{{opacity:1}} .aurora{{border-radius:38% 48% 42% 44% / 32% 31% 46% 44%;background:radial-gradient(circle at 8% 26%,rgba(45,246,207,.68),transparent 32%),radial-gradient(circle at 93% 75%,rgba(190,71,255,.75),transparent 37%),linear-gradient(145deg,rgba(10,80,118,.88),rgba(25,19,82,.92) 53%,rgba(83,27,145,.9));border-color:rgba(128,229,255,.8)}}
 .shine{{position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.22),transparent 26%,transparent 68%,rgba(181,132,255,.18));pointer-events:none}} .aurora .shine{{background:radial-gradient(ellipse at 17% 15%,rgba(255,255,255,.2),transparent 28%),linear-gradient(125deg,transparent 45%,rgba(139,84,255,.22))}}
 .top{{position:absolute;top:31px;left:46px;right:42px;text-align:center}} h1{{font-size:22px;margin:0;font-weight:700;letter-spacing:-.5px}} .close{{position:absolute;right:0;top:-5px;width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.38);background:rgba(255,255,255,.14);color:white;font-size:28px;line-height:35px;cursor:pointer}}
@@ -85,17 +85,23 @@ body{{display:flex;align-items:center;justify-content:center}} .shell{{position:
     return page.replace('</body></html>', '''<script>
 window.addEventListener('mousedown', function (event) {
   if (event.button !== 0 || event.target.closest('button')) return;
-  const margin = 16, x = event.clientX, y = event.clientY;
-  const vertical = y < margin ? 'NORTH' : y > innerHeight - margin ? 'SOUTH' : '';
-  const horizontal = x < margin ? 'WEST' : x > innerWidth - margin ? 'EAST' : '';
+  const insetX = 18, insetY = 20, hit = 10, x = event.clientX, y = event.clientY;
+  const vertical = Math.abs(y - insetY) <= hit ? 'NORTH' : Math.abs(y - (innerHeight - insetY)) <= hit ? 'SOUTH' : '';
+  const horizontal = Math.abs(x - insetX) <= hit ? 'WEST' : Math.abs(x - (innerWidth - insetX)) <= hit ? 'EAST' : '';
   const edge = vertical && horizontal ? vertical + '_' + horizontal : vertical || horizontal;
   if (edge) {
     event.preventDefault(); event.stopPropagation();
     document.title = 'resize:' + edge + ':' + Math.round(event.screenX) + ':' + Math.round(event.screenY);
-  } else if (y < 82) {
+  } else if (y >= insetY - hit && y < 82) {
     event.preventDefault(); event.stopPropagation();
     document.title = 'move:0:' + Math.round(event.screenX) + ':' + Math.round(event.screenY);
   }
+}, true);
+window.addEventListener('mousedown', function (event) {
+  // Do not let the legacy document handler treat the transparent outer margin
+  // as a resize edge. The active resize target starts at the visible shell.
+  const outer = 8;
+  if (event.clientX < outer || event.clientX > innerWidth - outer || event.clientY < outer || event.clientY > innerHeight - outer) event.stopPropagation();
 }, true);
 const tabs = document.querySelector('.switch');
 tabs.addEventListener('click', function (event) {
@@ -103,9 +109,9 @@ tabs.addEventListener('click', function (event) {
   pick(event.clientX < bounds.left + bounds.width / 2 ? 'ChatGPT' : 'Claude');
 });
 document.addEventListener('mousemove', function (event) {
-  const margin = 16, x = event.clientX, y = event.clientY;
-  const vertical = y < margin ? 'n' : y > innerHeight - margin ? 's' : '';
-  const horizontal = x < margin ? 'w' : x > innerWidth - margin ? 'e' : '';
+  const insetX = 18, insetY = 20, hit = 10, x = event.clientX, y = event.clientY;
+  const vertical = Math.abs(y - insetY) <= hit ? 'n' : Math.abs(y - (innerHeight - insetY)) <= hit ? 's' : '';
+  const horizontal = Math.abs(x - insetX) <= hit ? 'w' : Math.abs(x - (innerWidth - insetX)) <= hit ? 'e' : '';
   const cursor = vertical && horizontal ? (vertical === horizontal ? 'nwse-resize' : 'nesw-resize') : vertical ? vertical + 's-resize' : horizontal ? horizontal + 'w-resize' : 'default';
   document.body.style.cursor = cursor;
 }, true);
@@ -154,22 +160,16 @@ class App:
     def press(self, widget, event):
         width, height = widget.get_allocated_width(), widget.get_allocated_height()
         if event.button != 1: return False
-        edge = 12
-        if event.x <= edge or event.x >= width-edge or event.y <= edge or event.y >= height-edge:
-            horizontal = 'WEST' if event.x <= edge else 'EAST'
-            vertical = 'NORTH' if event.y <= edge else 'SOUTH'
-            if event.x <= edge and event.y <= edge: resize_edge = Gdk.WindowEdge.NORTH_WEST
-            elif event.x >= width-edge and event.y <= edge: resize_edge = Gdk.WindowEdge.NORTH_EAST
-            elif event.x <= edge and event.y >= height-edge: resize_edge = Gdk.WindowEdge.SOUTH_WEST
-            elif event.x >= width-edge and event.y >= height-edge: resize_edge = Gdk.WindowEdge.SOUTH_EAST
-            elif event.x <= edge: resize_edge = Gdk.WindowEdge.WEST
-            elif event.x >= width-edge: resize_edge = Gdk.WindowEdge.EAST
-            elif event.y <= edge: resize_edge = Gdk.WindowEdge.NORTH
-            else: resize_edge = Gdk.WindowEdge.SOUTH
+        inset_x, inset_y, hit = 18, 20, 10
+        horizontal = 'WEST' if abs(event.x - inset_x) <= hit else 'EAST' if abs(event.x - (width - inset_x)) <= hit else ''
+        vertical = 'NORTH' if abs(event.y - inset_y) <= hit else 'SOUTH' if abs(event.y - (height - inset_y)) <= hit else ''
+        if horizontal or vertical:
+            edge_name = f'{vertical}_{horizontal}' if vertical and horizontal else vertical or horizontal
+            resize_edge = getattr(Gdk.WindowEdge, edge_name)
             self.window.begin_resize_drag(resize_edge, event.button, int(event.x_root), int(event.y_root), event.time)
             return True
         # Header/empty surface drags the widget; controls below remain clickable.
-        if event.y < 126 and not (event.x > width - 92 and event.y < 105):
+        if event.y >= inset_y - hit and event.y < 82 and not (event.x > width - 92 and event.y < 82):
             self.window.begin_move_drag(event.button, int(event.x_root), int(event.y_root), event.time)
             return True
         return False
