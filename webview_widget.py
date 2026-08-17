@@ -124,6 +124,8 @@ requestRefresh = function () {};
 class App:
     def __init__(self, theme):
         self.window=Gtk.Window(); self.window.set_title('AI Usage Widget'); self.window.set_wmclass('ai-usage-widget', 'AI Usage Widget'); self.window.set_decorated(False); self.window.set_keep_above(False); self.window.set_default_size(420,540); self.window.set_resizable(True); self.window.set_size_request(330,440); self.window.set_app_paintable(True)
+        try: self.window.set_icon_from_file(str(Path(__file__).resolve().parent / 'assets' / 'ai-usage-widget.svg'))
+        except GLib.Error: pass
         screen=self.window.get_screen(); self.window.set_visual(screen.get_rgba_visual())
         # Keep the native container transparent; only the HTML glass shell paints.
         native_css = Gtk.CssProvider()

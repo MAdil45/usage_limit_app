@@ -59,7 +59,7 @@ To uninstall the app launcher later, run:
 ./uninstall-linux-app.sh
 ```
 
-This removes only the per-user launcher; it does not remove the project folder or your locally saved usage data.
+This removes the per-user launcher and icon; it does not remove the project folder or your locally saved usage data.
 
 Legacy prototype launchers (`run-widget.sh`, `run-aurora-glass.sh`, and `run-glass-capsule.sh`) remain in the repository for reference; use the two `*-web.sh` launchers above for the current experience.
 
