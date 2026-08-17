@@ -1,4 +1,4 @@
-// Opens signed-in usage pages in an off-screen Chrome popup and forwards only
+// Opens signed-in usage pages in a minimized Chrome popup and forwards only
 // usage percentages/reset labels to the desktop widget's localhost listener.
 const LOCAL_RECEIVER = "http://127.0.0.1:8765/usage";
 const USAGE_URLS = {
@@ -44,10 +44,11 @@ async function drainRefreshQueue(force = false) {
   try {
     const status = await widgetStatus();
     if (!status || (!force && !status.periodic_refresh_allowed)) return;
-    // `chrome.system.display` is not consistently available on Linux Chrome
-    // builds. A minimized popup is portable and never occupies the desktop.
+    // This is deliberately minimized instead of positioned off-screen: Chrome
+    // rejects off-screen bounds on Linux and a background tab may create a
+    // visible normal Chrome window when no browser window is available.
     const backgroundWindow = await chrome.windows.create({
-      url: USAGE_URLS[provider], type: "popup", focused: false, state: "minimized"
+      url: USAGE_URLS[provider], type: "popup", state: "minimized", focused: false
     });
     const tabs = await chrome.tabs.query({ windowId: backgroundWindow.id });
     if (!tabs[0]) {

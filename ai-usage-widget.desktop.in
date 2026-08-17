@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=AI Usage Widget
+Comment=See your ChatGPT and Claude usage limits
+Exec=@APP_DIR@/run-glass-web.sh
+TryExec=@APP_DIR@/run-glass-web.sh
+Icon=@APP_DIR@/assets/ai-usage-widget.svg
+Terminal=false
+Categories=Utility;Monitor;
+StartupNotify=true
+StartupWMClass=ai-usage-widget
