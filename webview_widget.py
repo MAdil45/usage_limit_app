@@ -15,6 +15,7 @@ REFRESHES = queue.Queue()
 REFRESH_CONDITION = threading.Condition()
 STARTED_AT = time.monotonic()
 STARTUP_QUIET_SECONDS = 30
+ACTIVE_APP = None
 # Glass-only idle background strength: 0.0 = invisible, 1.0 = fully opaque.
 # Change this number, save, and restart the Glass widget to try a new value.
 GLASS_IDLE_OPACITY = 0.35
@@ -39,7 +40,13 @@ class Receiver(BaseHTTPRequestHandler):
         # reloads it.  That is normal and must not create a server traceback.
         except (BrokenPipeError, ConnectionResetError): pass
     def do_GET(self):
-        if self.path == '/status':
+        if self.path == '/show':
+            if ACTIVE_APP is None:
+                self._reply(503); self._write(b'widget is starting')
+            else:
+                GLib.idle_add(ACTIVE_APP.window.present)
+                self._reply(); self._write(b'widget shown')
+        elif self.path == '/status':
             self._reply(); self._write(json.dumps({"widget":"running", "periodic_refresh_allowed":periodic_refresh_allowed()}).encode())
         elif self.path.startswith('/refresh'):
             # The extension's offscreen page long-polls this endpoint, which
@@ -123,6 +130,7 @@ requestRefresh = function () {};
 
 class App:
     def __init__(self, theme):
+        global ACTIVE_APP
         self.window=Gtk.Window(); self.window.set_title('AI Usage Widget'); self.window.set_wmclass('ai-usage-widget', 'AI Usage Widget'); self.window.set_decorated(False); self.window.set_keep_above(False); self.window.set_default_size(420,540); self.window.set_resizable(True); self.window.set_size_request(330,440); self.window.set_app_paintable(True)
         try: self.window.set_icon_from_file(str(Path(__file__).resolve().parent / 'assets' / 'ai-usage-widget.svg'))
         except GLib.Error: pass
@@ -133,7 +141,7 @@ class App:
         Gtk.StyleContext.add_provider_for_screen(screen, native_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         self.codex_refresh_running=False
         self.web=WebKit2.WebView(); self.web.set_background_color(Gdk.RGBA(0,0,0,0)); self.web.add_events(Gdk.EventMask.BUTTON_PRESS_MASK); self.window.add(self.web); self.web.connect('notify::title',self.title); self.web.connect('button-press-event',self.press); self.window.connect('destroy',Gtk.main_quit)
-        self.web.load_html(html(theme), 'file:///'); self.window.show_all(); GLib.timeout_add(1000,self.tick); GLib.idle_add(self.startup_refresh)
+        self.web.load_html(html(theme), 'file:///'); self.window.show_all(); ACTIVE_APP = self; GLib.timeout_add(1000,self.tick); GLib.idle_add(self.startup_refresh)
     def startup_refresh(self):
         # Sync both providers once at launch.  Further hover/click/alarm syncs
         # are deliberately ignored for 30 seconds to avoid duplicate refreshes.

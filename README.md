@@ -52,6 +52,7 @@ Install a launcher for the current user (no `sudo` required):
 ```
 
 Then find **AI Usage Widget** in your Linux app launcher and open it like any other desktop app. The launcher starts the Glass design.
+If the widget is already running, selecting its launcher brings that existing window to the front instead of starting a duplicate.
 
 To uninstall the app launcher later, run:
 
