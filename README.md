@@ -1,84 +1,56 @@
 # AI Usage Widget
 
-A local Linux desktop widget for keeping ChatGPT/Codex and Claude plan limits in view. It offers two designs:
+A local Linux desktop widget for keeping ChatGPT/Codex and Claude plan limits in view. The app provides one focused interface: a compact, frosted-glass usage gadget.
 
-- **Aurora** — an organic neon glass form.
-- **Glass** — a frosted rounded capsule that fades its background while idle and becomes fully vivid on hover.
-
-The widget behaves like a normal desktop app: it comes to the front when you select it, but it does not stay above your other windows. It continues refreshing while it is in the background. Its data is stored only on the local computer in `~/.config/ai-usage-widget/usage.json`.
-
-## What it shows
-
-| Provider | Limits shown |
-| --- | --- |
-| ChatGPT / Codex | Weekly limit and reset time |
-| Claude | Current 5-hour session and weekly limit, each with its own meter and reset time |
-
-Both designs can be moved by dragging their empty header area and resized from any edge or corner.
+It displays the ChatGPT/Codex weekly limit and Claude's current 5-hour session plus weekly limit. The widget can be moved by dragging its empty header, resized from any edge or corner, and brought forward by launching it again. Usage data stays on the local computer in `~/.config/ai-usage-widget/usage.json`.
 
 ## Requirements
 
-The recommended widgets use GTK and WebKit. On Ubuntu/Debian:
+On Ubuntu/Debian, install GTK and WebKit:
 
 ```bash
 sudo apt install python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.0
 ```
 
-You also need Chrome for the companion extension, plus active signed-in ChatGPT/Codex and Claude accounts.
+Chrome is required for automatic usage updates, with active signed-in ChatGPT/Codex and Claude sessions.
 
 ## Run
 
-From this directory:
-
 ```bash
-chmod +x run-aurora-web.sh run-glass-web.sh
-./run-aurora-web.sh
+git clone https://github.com/MAdil45/usage_limit_app.git
+cd usage_limit_app
+./run-widget.sh
 ```
-
-Or launch the Glass design:
-
-```bash
-./run-glass-web.sh
-```
-
-Close a running widget before starting the other design. The current launchers refresh usage through the Chrome companion extension while the widget is open.
 
 ## Install as a Linux desktop app
-
-Install a launcher for the current user (no `sudo` required):
 
 ```bash
 ./install-linux-app.sh
 ```
 
-Then find **AI Usage Widget** in your Linux app launcher and open it like any other desktop app. The launcher starts the Glass design.
-If the widget is already running, selecting its launcher brings that existing window to the front instead of starting a duplicate.
-
-To uninstall the app launcher later, run:
+Find **AI Usage Widget** in the Linux app launcher. To remove the launcher later without deleting the project or saved usage data:
 
 ```bash
 ./uninstall-linux-app.sh
 ```
 
-This removes the per-user launcher and icon; it does not remove the project folder or your locally saved usage data.
-
-Legacy prototype launchers (`run-widget.sh`, `run-aurora-glass.sh`, and `run-glass-capsule.sh`) remain in the repository for reference; use the two `*-web.sh` launchers above for the current experience.
-
-## Automatic usage updates
-
-Install the included Chrome extension once:
+## Enable automatic usage updates
 
 1. Open `chrome://extensions`.
 2. Enable **Developer mode**.
 3. Choose **Load unpacked** and select this repository's `browser-companion` directory.
-4. Keep the extension enabled. After pulling an update, use Chrome's reload button for the extension.
+4. Keep the extension enabled, and reload it after updating the repository.
 
-At widget launch, both providers refresh once. For the next 30 seconds, all periodic refreshes are suppressed so launch cannot cause duplicate work. After that quiet period, Claude refreshes every 30 seconds and ChatGPT/Codex every minute through their signed-in browser usage pages. The widget intentionally does not refresh on hover or model selection. Refreshes run through the Chrome companion without automating the Codex desktop app, and they stop when the widget is closed.
+At launch, both providers refresh once. After a 30-second quiet period, Claude refreshes every 30 seconds and ChatGPT/Codex every minute through their signed-in usage pages. Refreshes stop when the widget closes.
 
-After updating this repository, go to `chrome://extensions` and click the extension's **Reload** button once. The new instant-Claude refresh uses Chrome's local offscreen extension page, so reload is required for a previously installed extension.
+## Project layout
+
+- `webview_widget.py` — the Glass widget interface and local update server.
+- `run-widget.sh` — the single-instance application launcher.
+- `browser-companion/` — the Chrome extension that reads usage values from signed-in provider pages.
+- `codex_usage_sync.py` — the local ChatGPT/Codex usage synchronization helper.
+- `install-linux-app.sh` — installs the desktop launcher and icon for the current user.
 
 ## Privacy
 
-No passwords, cookies, API keys, prompts, chats, or account identifiers are saved or sent by this project. The Chrome companion sends only the provider name, usage percentage, and displayed reset label to the widget's local listener at `http://127.0.0.1:8765`.
-
-The site interfaces can change. If Claude or ChatGPT/Codex redesigns its usage screen, the usage-page parsing may need an update.
+The companion sends only the provider name, usage percentage, and displayed reset label to the local listener at `http://127.0.0.1:8765`. It does not save or send passwords, cookies, API keys, prompts, chats, or account identifiers.

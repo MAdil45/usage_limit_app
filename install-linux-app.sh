@@ -11,7 +11,7 @@ LAUNCHER="$APPLICATIONS_DIR/ai-usage-widget.desktop"
 mkdir -p "$APPLICATIONS_DIR" "$ICON_DIR"
 sed "s|@APP_DIR@|$APP_DIR|g" "$APP_DIR/ai-usage-widget.desktop.in" > "$LAUNCHER"
 install -m 644 "$APP_DIR/assets/ai-usage-widget.svg" "$ICON_DIR/ai-usage-widget.svg"
-chmod 755 "$APP_DIR/run-glass-web.sh" "$LAUNCHER"
+chmod 755 "$APP_DIR/run-widget.sh" "$LAUNCHER"
 
 if command -v update-desktop-database >/dev/null 2>&1; then
   update-desktop-database "$APPLICATIONS_DIR" >/dev/null 2>&1 || true
