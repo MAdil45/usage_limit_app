@@ -18,6 +18,22 @@ function resetAfter(text, anchor) {
   const match = slice.match(/Resets?\s+(?:in\s+)?(.+?)(?=\s+\d+(?:\.\d+)?%|\s+(?:Usage limit resets|Last updated|Usage credits|Credits remaining|Auto reload|Usage breakdown|Personal usage)|$)/i);
   return match ? `Resets ${match[1].trim()}` : null;
 }
+function firstAnchor(text, candidates) {
+  const lower = text.toLowerCase();
+  return candidates
+    .map(label => ({ label, at: lower.indexOf(label.toLowerCase()) }))
+    .filter(candidate => candidate.at >= 0)
+    .sort((a, b) => a.at - b.at)[0] || null;
+}
+function meterBetween(text, anchor, nextAnchor) {
+  if (!anchor) return {};
+  const end = nextAnchor && nextAnchor.at > anchor.at ? nextAnchor.at : anchor.at + 500;
+  const section = text.slice(anchor.at, end);
+  return {
+    used: percentAfter(section, anchor.label),
+    reset_label: resetAfter(section, anchor.label)
+  };
+}
 function extractClaude(text) {
   if (!/Plan usage limits|Weekly limits/i.test(text)) return null;
   return { provider: "Claude", windows: {
@@ -26,11 +42,13 @@ function extractClaude(text) {
   }};
 }
 function extractChatGPT(text) {
-  const anchor = /Weekly usage limit/i.test(text) ? "Weekly usage limit" : /Weekly limit/i.test(text) ? "Weekly limit" : null;
-  if (!anchor) return null;
-  return { provider: "ChatGPT", windows: { "Weekly": {
-    used: percentAfter(text, anchor), reset_label: resetAfter(text, anchor)
-  }}};
+  const session = firstAnchor(text, ["5-hour usage limit", "5 hour usage limit", "5-hour limit", "5 hour limit", "Current session"]);
+  const weekly = firstAnchor(text, ["Weekly usage limit", "Weekly limit"]);
+  if (!session && !weekly) return null;
+  return { provider: "ChatGPT", windows: {
+    "5-hour": meterBetween(text, session, weekly),
+    "Weekly": meterBetween(text, weekly, null)
+  }};
 }
 function publish() {
   const text = normalizedText();

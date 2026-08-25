@@ -2,7 +2,7 @@
 
 A local Linux desktop widget for keeping ChatGPT/Codex and Claude plan limits in view. The app provides one focused interface: a compact, frosted-glass usage gadget.
 
-It displays the ChatGPT/Codex weekly limit and Claude's current 5-hour session plus weekly limit. The widget can be moved by dragging its empty header, resized from any edge or corner, and brought forward by launching it again. Usage data stays on the local computer in `~/.config/ai-usage-widget/usage.json`.
+It displays the current 5-hour session and weekly limit for both ChatGPT/Codex and Claude. The widget can be moved by dragging its empty header, resized from any edge or corner, and brought forward by launching it again. Usage data stays on the local computer in `~/.config/ai-usage-widget/usage.json`.
 
 ## Requirements
 

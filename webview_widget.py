@@ -21,6 +21,26 @@ ACTIVE_APP = None
 GLASS_IDLE_OPACITY = 0.35
 warnings.filterwarnings('ignore', category=DeprecationWarning, message='WebKit2.WebView.run_javascript is deprecated')
 
+def load_state():
+    try:
+        data = json.loads(STATE.read_text())
+    except (OSError, json.JSONDecodeError):
+        data = {}
+    providers = data.setdefault('providers', {})
+    changed = False
+    for provider in ('ChatGPT', 'Claude'):
+        if provider not in providers:
+            providers[provider] = {'label': provider}
+            changed = True
+        for meter in ('5-hour', 'Weekly'):
+            if meter not in providers[provider]:
+                providers[provider][meter] = {'remaining': None}
+                changed = True
+    if changed or not STATE.exists():
+        STATE.parent.mkdir(parents=True, exist_ok=True)
+        STATE.write_text(json.dumps(data, indent=2))
+    return data
+
 def periodic_refresh_allowed():
     return time.monotonic() - STARTED_AT >= STARTUP_QUIET_SECONDS
 
@@ -78,10 +98,10 @@ body{{display:flex;align-items:center;justify-content:center}} .shell{{position:
 .top{{position:absolute;top:31px;left:46px;right:42px;text-align:center}} h1{{font-size:22px;margin:0;font-weight:700;letter-spacing:-.5px}} .close{{position:absolute;right:0;top:-5px;width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.38);background:rgba(255,255,255,.14);color:white;font-size:28px;line-height:35px;cursor:pointer}}
 .switch{{position:absolute;left:46px;right:46px;top:142px;height:62px;border-radius:31px;padding:4px;display:flex;background:rgba(8,19,61,.42);border:1px solid rgba(255,255,255,.25)}} .choice{{border:0;background:transparent;color:#f5f7ff;flex:1;border-radius:27px;text-align:left;padding:9px 13px;line-height:17px;cursor:pointer;font-size:12px;white-space:nowrap}} .choice b{{font-size:13px;display:block}} .choice.active{{background:linear-gradient(135deg,#f7ffff,#cfeafa);color:#17263d;box-shadow:0 3px 13px rgba(5,10,45,.24)}}
 .main{{position:absolute;top:226px;left:46px;right:46px;text-align:center}} .eyebrow{{font-size:13px;font-weight:650;color:#d7e7ff}} .percent{{font-size:76px;line-height:82px;letter-spacing:-5px;font-weight:760;margin-top:2px;text-shadow:0 3px 20px rgba(18,34,82,.5)}} .reset{{font-size:13px;color:#d8e6ff;margin-top:4px}} .bar{{margin-top:25px;height:18px;border-radius:12px;background:rgba(243,244,255,.3);box-shadow:inset 0 1px 5px rgba(8,13,55,.28);overflow:hidden}} .fill{{height:100%;width:0%;border-radius:inherit;background:linear-gradient(90deg,#68e9ff,#7a9eff);box-shadow:0 0 14px rgba(85,238,255,.6);transition:width .55s ease}} .caption{{font-size:12px;color:#dce8ff;margin-top:12px}} .updated{{position:absolute;bottom:38px;left:30px;right:30px;text-align:center;font-size:11px;color:#d8e9ff;opacity:.85}} .weekly{{display:none;margin-top:17px;padding-top:11px;border-top:1px solid rgba(255,255,255,.25);text-align:left}} .weekly-head{{display:flex;justify-content:space-between;font-size:12px;color:#e1edff}} .weekly-head b{{font-size:15px;color:#fff}} .weekly .bar{{height:10px;margin-top:8px}} .claude-mode .percent{{font-size:58px;line-height:63px}} .claude-mode .bar{{margin-top:17px}} .claude-mode .weekly{{display:block}} .grip{{position:absolute;right:12px;bottom:10px;width:28px;height:28px;opacity:.82;background:repeating-linear-gradient(135deg,transparent 0 6px,rgba(255,255,255,.78) 6px 7px);border-radius:4px;pointer-events:none}}
-/* Pull the navigation upward so Claude's two usage meters breathe. */
+/* Pull the navigation upward so both providers' two usage meters breathe. */
  .switch{{top:96px}} .main{{top:186px}} .claude-mode .main{{top:178px}} .claude-mode .weekly{{margin-top:13px;padding-top:9px}} .claude-mode .weekly .bar{{margin-top:6px}}
 @media (max-height:490px){{.top{{top:22px;left:34px;right:32px}}.switch{{top:78px;left:34px;right:34px;height:56px}}.main,.claude-mode .main{{top:150px;left:34px;right:34px}}.percent{{font-size:64px;line-height:68px}}.claude-mode .percent{{font-size:50px;line-height:54px}}.bar{{margin-top:14px}}.updated{{bottom:26px}}}}
-</style></head><body><div id="shell" class="shell glass"><div class="shine"></div><div class="top"><h1>AI Usage</h1><button class="close" onclick="document.title='close'">×</button></div><div class="switch"><button id="chat" class="choice active" onclick="pick('ChatGPT')"><b>✦ ChatGPT</b>Weekly</button><button id="claude" class="choice" onclick="pick('Claude')"><b>✺ Claude</b>5-hour + weekly</button></div><div class="main"><div id="eyebrow" class="eyebrow">Weekly usage</div><div id="percent" class="percent">—</div><div id="reset" class="reset">Waiting for sync</div><div class="bar"><div id="fill" class="fill"></div></div><div id="caption" class="caption">of weekly allowance used</div><div id="weekly" class="weekly"><div class="weekly-head"><span>Weekly limit</span><b id="weekly-used">—</b></div><div id="weekly-reset" class="reset">Waiting for sync</div><div class="bar"><div id="weekly-fill" class="fill"></div></div></div></div><div id="updated" class="updated">Local • private • always in reach</div><div class="grip"></div></div><script>let provider='ChatGPT',lastRequested={{}},refreshing=null;function requestRefresh(p){{let now=Date.now();if(now-(lastRequested[p]||0)<5000)return;lastRequested[p]=now;refreshing={{provider:p,started:now}};document.getElementById('updated').textContent='Refreshing '+p+'…';document.title='refresh:'+p+':'+now}}function pick(p){{provider=p;document.getElementById('chat').classList.toggle('active',p==='ChatGPT');document.getElementById('claude').classList.toggle('active',p==='Claude');render(window.data||{{}});requestRefresh(p)}}function pct(e){{return Number.isFinite(e?.used)?e.used:(Number.isFinite(e?.remaining)?100-e.remaining:null)}}function render(d){{window.data=d;let w=d?.providers?.[provider]||{{}};let e=w[provider==='Claude'?'5-hour':'Weekly']||{{}};let used=pct(e);if(refreshing?.provider===provider&&Date.parse(e.updated_at||'')>=refreshing.started)refreshing=null;document.getElementById('shell').classList.toggle('claude-mode',provider==='Claude');document.getElementById('eyebrow').textContent=provider==='Claude'?'Current session':'Weekly usage';document.getElementById('percent').textContent=used===null?'—':Math.round(used)+'%';document.getElementById('fill').style.width=(used||0)+'%';document.getElementById('reset').textContent=e.reset_label||'Waiting for sync';document.getElementById('caption').textContent=provider==='Claude'?'of 5-hour session used':'of weekly allowance used';let weekly=w['Weekly']||{{}};let wu=pct(weekly);document.getElementById('weekly-used').textContent=wu===null?'—':Math.round(wu)+'% used';document.getElementById('weekly-reset').textContent=weekly.reset_label||'Waiting for sync';document.getElementById('weekly-fill').style.width=(wu||0)+'%';document.getElementById('updated').textContent=refreshing?.provider===provider?'Refreshing '+provider+'…':e.updated_at?'Last updated '+new Date(e.updated_at).toLocaleTimeString():'Local • private • always in reach'}};document.getElementById('shell').addEventListener('mouseenter',()=>requestRefresh(provider));document.addEventListener('mousedown',e=>{{if(e.button!==0||e.target.closest('button'))return;const m=16,x=e.clientX,y=e.clientY,w=innerWidth,h=innerHeight;let edge='';if(y<m)edge+='N';else if(y>h-m)edge+='S';if(x<m)edge+=edge?'_W':'W';else if(x>w-m)edge+=edge?'_E':'E';if(edge){{e.preventDefault();document.title=`resize:${{edge}}:${{Math.round(e.screenX)}}:${{Math.round(e.screenY)}}`;}}else if(y<130){{e.preventDefault();document.title=`move:0:${{edge}}:${{Math.round(e.screenX)}}:${{Math.round(e.screenY)}}`;}}}},true);</script></body></html>'''
+</style></head><body><div id="shell" class="shell glass claude-mode"><div class="shine"></div><div class="top"><h1>AI Usage</h1><button class="close" onclick="document.title='close'">×</button></div><div class="switch"><button id="chat" class="choice active" onclick="pick('ChatGPT')"><b>✦ ChatGPT</b>5-hour + weekly</button><button id="claude" class="choice" onclick="pick('Claude')"><b>✺ Claude</b>5-hour + weekly</button></div><div class="main"><div id="eyebrow" class="eyebrow">Current session</div><div id="percent" class="percent">—</div><div id="reset" class="reset">Waiting for sync</div><div class="bar"><div id="fill" class="fill"></div></div><div id="caption" class="caption">of 5-hour session used</div><div id="weekly" class="weekly"><div class="weekly-head"><span>Weekly limit</span><b id="weekly-used">—</b></div><div id="weekly-reset" class="reset">Waiting for sync</div><div class="bar"><div id="weekly-fill" class="fill"></div></div></div></div><div id="updated" class="updated">Local • private • always in reach</div><div class="grip"></div></div><script>let provider='ChatGPT',lastRequested={{}},refreshing=null;function requestRefresh(p){{let now=Date.now();if(now-(lastRequested[p]||0)<5000)return;lastRequested[p]=now;refreshing={{provider:p,started:now}};document.getElementById('updated').textContent='Refreshing '+p+'…';document.title='refresh:'+p+':'+now}}function pick(p){{provider=p;document.getElementById('chat').classList.toggle('active',p==='ChatGPT');document.getElementById('claude').classList.toggle('active',p==='Claude');render(window.data||{{}});requestRefresh(p)}}function pct(e){{return Number.isFinite(e?.used)?e.used:(Number.isFinite(e?.remaining)?100-e.remaining:null)}}function render(d){{window.data=d;let w=d?.providers?.[provider]||{{}};let e=w['5-hour']||{{}};let used=pct(e);if(refreshing?.provider===provider&&Date.parse(e.updated_at||'')>=refreshing.started)refreshing=null;document.getElementById('eyebrow').textContent='Current session';document.getElementById('percent').textContent=used===null?'—':Math.round(used)+'%';document.getElementById('fill').style.width=(used||0)+'%';document.getElementById('reset').textContent=e.reset_label||'Waiting for sync';document.getElementById('caption').textContent='of 5-hour session used';let weekly=w['Weekly']||{{}};let wu=pct(weekly);document.getElementById('weekly-used').textContent=wu===null?'—':Math.round(wu)+'% used';document.getElementById('weekly-reset').textContent=weekly.reset_label||'Waiting for sync';document.getElementById('weekly-fill').style.width=(wu||0)+'%';let updated=e.updated_at||weekly.updated_at;document.getElementById('updated').textContent=refreshing?.provider===provider?'Refreshing '+provider+'…':updated?'Last updated '+new Date(updated).toLocaleTimeString():'Local • private • always in reach'}};document.getElementById('shell').addEventListener('mouseenter',()=>requestRefresh(provider));document.addEventListener('mousedown',e=>{{if(e.button!==0||e.target.closest('button'))return;const m=16,x=e.clientX,y=e.clientY,w=innerWidth,h=innerHeight;let edge='';if(y<m)edge+='N';else if(y>h-m)edge+='S';if(x<m)edge+=edge?'_W':'W';else if(x>w-m)edge+=edge?'_E':'E';if(edge){{e.preventDefault();document.title=`resize:${{edge}}:${{Math.round(e.screenX)}}:${{Math.round(e.screenY)}}`;}}else if(y<130){{e.preventDefault();document.title=`move:0:${{edge}}:${{Math.round(e.screenX)}}:${{Math.round(e.screenY)}}`;}}}},true);</script></body></html>'''
 
     # WebKit consumes ordinary GTK mouse events. This capture listener forwards
     # header drags and every window edge/corner to the native GTK window.
@@ -185,18 +205,15 @@ class App:
             p=EVENTS.get()
             if p.get('action') == 'refresh-codex':
                 self.refresh_codex(); continue
-            data=json.loads(STATE.read_text()); provider=p['provider']
-            provider_changed=False
+            data=load_state(); provider=p['provider']
             for name,val in p.get('windows',{}).items():
                 if name not in data['providers'][provider]: continue
-                if isinstance(val.get('used'),(int,float)): data['providers'][provider][name]['used']=val['used'];data['providers'][provider][name]['remaining']=100-val['used'];provider_changed=True
-                if isinstance(val.get('reset_label'),str): data['providers'][provider][name]['reset_label']=val['reset_label'];provider_changed=True
-            if provider_changed:
-                for meter in data['providers'][provider].values():
-                    if isinstance(meter, dict): meter['updated_at']=datetime.now(timezone.utc).isoformat()
+                meter=data['providers'][provider][name]; meter_changed=False
+                if isinstance(val.get('used'),(int,float)): meter['used']=val['used'];meter['remaining']=100-val['used'];meter_changed=True
+                if isinstance(val.get('reset_label'),str): meter['reset_label']=val['reset_label'];meter_changed=True
+                if meter_changed: meter['updated_at']=datetime.now(timezone.utc).isoformat()
             STATE.write_text(json.dumps(data,indent=2)); changed=True
-        try: data=STATE.read_text()
-        except OSError: data='{}'
+        data=json.dumps(load_state())
         self.web.run_javascript('render('+data+')',None,None,None)
         return True
     def refresh_codex(self):
@@ -208,4 +225,5 @@ class App:
         threading.Thread(target=run_refresh, daemon=True).start()
 
 if __name__=='__main__':
+    load_state()
     server=ThreadingHTTPServer(('127.0.0.1',8765),Receiver);threading.Thread(target=server.serve_forever,daemon=True).start();App();Gtk.main()

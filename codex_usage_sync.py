@@ -35,6 +35,21 @@ def find_usage_menu_y(path):
                 return int(word[7]) + int(word[9]) // 2
     return None
 
+def read_meter(text, heading_pattern, next_heading_pattern=None):
+    heading = re.search(heading_pattern, text, re.I)
+    if not heading: return None
+    end = len(text)
+    if next_heading_pattern:
+        next_heading = re.search(next_heading_pattern, text[heading.end():], re.I)
+        if next_heading: end = heading.end() + next_heading.start()
+    section = text[heading.start():end]
+    percent = re.search(r"(\d{1,3}(?:\.\d+)?)\s*%\s*(used|left|remaining)", section, re.I)
+    if not percent: return None
+    value = float(percent.group(1))
+    used = 100 - value if percent.group(2).lower() in ("left", "remaining") else value
+    reset = re.search(r"Resets?\s+(?:in\s+)?([^\n]+)", section, re.I)
+    return {"used": used, "reset_label": f"Resets {reset.group(1).strip()}" if reset else None}
+
 def sync():
     previous = run("xdotool", "getactivewindow", check=False)
     codex = visible_codex_window()
@@ -51,17 +66,27 @@ def sync():
             if y is None: raise RuntimeError("Could not locate Usage & billing in Codex Settings")
             run("xdotool", "mousemove", "--window", codex, "112", str(y)); run("xdotool", "click", "--window", codex, "1"); time.sleep(1.6)
             capture(codex, page); text = ocr(page)
-        match = re.search(r"(\d{1,3})\s*%\s*(?:left|remaining)", text, re.I)
-        reset = re.search(r"Resets?\s+([^\n]+)", text, re.I)
-        if not match: raise RuntimeError("Could not read Codex weekly usage from Usage & billing")
-        used = 100 - int(match.group(1))
-        data = json.loads(STATE.read_text())
-        weekly = data["providers"]["ChatGPT"]["Weekly"]
-        weekly["used"], weekly["remaining"] = used, 100 - used
-        if reset: weekly["reset_label"] = f"Resets {reset.group(1).strip()}"
-        weekly["updated_at"] = datetime.now(timezone.utc).isoformat()
+        session_heading = r"(?:5[\s-]*hour(?:\s+usage)?\s+limit|current\s+session)"
+        weekly_heading = r"weekly(?:\s+usage)?\s+limit"
+        meters = {
+            "5-hour": read_meter(text, session_heading, weekly_heading),
+            "Weekly": read_meter(text, weekly_heading),
+        }
+        if not any(meters.values()): raise RuntimeError("Could not read Codex usage limits from Usage & billing")
+        try: data = json.loads(STATE.read_text())
+        except (OSError, json.JSONDecodeError): data = {"providers": {}}
+        provider = data.setdefault("providers", {}).setdefault("ChatGPT", {"label": "ChatGPT"})
+        updated = datetime.now(timezone.utc).isoformat()
+        for name, values in meters.items():
+            if not values: continue
+            meter = provider.setdefault(name, {})
+            meter["used"], meter["remaining"] = values["used"], 100 - values["used"]
+            if values["reset_label"]: meter["reset_label"] = values["reset_label"]
+            meter["updated_at"] = updated
+        STATE.parent.mkdir(parents=True, exist_ok=True)
         STATE.write_text(json.dumps(data, indent=2))
-        print(f"Codex synced: {used}% used")
+        summary = ", ".join(f"{name}: {values['used']:g}% used" for name, values in meters.items() if values)
+        print(f"Codex synced: {summary}")
     finally:
         run("xdotool", "key", "Escape", check=False)
         if previous: run("xdotool", "windowfocus", "--sync", previous, check=False)
