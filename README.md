@@ -54,3 +54,7 @@ At launch, both providers refresh once. After a 30-second quiet period, Claude r
 ## Privacy
 
 The companion sends only the provider name, usage percentage, and displayed reset label to the local listener at `http://127.0.0.1:8765`. It does not save or send passwords, cookies, API keys, prompts, chats, or account identifiers.
+
+## Provider marks
+
+The provider switch uses the official OpenAI/ChatGPT Blossom from the [OpenAI design guidelines](https://openai.com/brand/) and Claude Spark from the [Anthropic press kit](https://www.anthropic.com/press-kit). These marks belong to OpenAI and Anthropic respectively, are used only to identify the corresponding usage service, and do not imply endorsement of this project.
