@@ -8,7 +8,7 @@ async function monitor() {
     try {
       const response = await fetch(REFRESH_URL, { cache: "no-store" });
       const request = await response.json();
-      if (request.provider === "Claude" || request.provider === "ChatGPT") {
+      if (request.provider === "Claude") {
         await chrome.runtime.sendMessage({ type: "refresh-request", provider: request.provider });
       }
     } catch (_) {

@@ -1,4 +1,5 @@
-// Reads only visible usage-card text and sends the parsed values to localhost.
+// Prefer the same signed-in, read-only usage requests used by the provider
+// pages. Visible text remains a fallback for accounts with a different shape.
 function normalizedText() {
   return ((document.body && document.body.innerText) || "").replace(/\s+/g, " ").trim();
 }
@@ -18,22 +19,6 @@ function resetAfter(text, anchor) {
   const match = slice.match(/Resets?\s+(?:in\s+)?(.+?)(?=\s+\d+(?:\.\d+)?%|\s+(?:Usage limit resets|Last updated|Usage credits|Credits remaining|Auto reload|Usage breakdown|Personal usage)|$)/i);
   return match ? `Resets ${match[1].trim()}` : null;
 }
-function firstAnchor(text, candidates) {
-  const lower = text.toLowerCase();
-  return candidates
-    .map(label => ({ label, at: lower.indexOf(label.toLowerCase()) }))
-    .filter(candidate => candidate.at >= 0)
-    .sort((a, b) => a.at - b.at)[0] || null;
-}
-function meterBetween(text, anchor, nextAnchor) {
-  if (!anchor) return {};
-  const end = nextAnchor && nextAnchor.at > anchor.at ? nextAnchor.at : anchor.at + 500;
-  const section = text.slice(anchor.at, end);
-  return {
-    used: percentAfter(section, anchor.label),
-    reset_label: resetAfter(section, anchor.label)
-  };
-}
 function extractClaude(text) {
   if (!/Plan usage limits|Weekly limits/i.test(text)) return null;
   return { provider: "Claude", windows: {
@@ -41,27 +26,57 @@ function extractClaude(text) {
     "Weekly": { used: percentAfter(text, "All models"), reset_label: resetAfter(text, "All models") }
   }};
 }
-function extractChatGPT(text) {
-  const session = firstAnchor(text, ["5-hour usage limit", "5 hour usage limit", "5-hour limit", "5 hour limit", "Current session"]);
-  const weekly = firstAnchor(text, ["Weekly usage limit", "Weekly limit"]);
-  if (!session && !weekly) return null;
-  return { provider: "ChatGPT", windows: {
-    "5-hour": meterBetween(text, session, weekly),
-    "Weekly": meterBetween(text, weekly, null)
-  }};
+
+async function fetchJson(url) {
+  const response = await fetch(url, { credentials: "include", cache: "no-store" });
+  if (!response.ok) throw new Error(`${url} returned ${response.status}`);
+  return response.json();
 }
-function publish() {
+
+async function fetchClaudeUsage() {
+  let organizations;
+  try { organizations = await fetchJson("/api/organizations"); }
+  catch (_) { return null; }
+  const list = Array.isArray(organizations) ? organizations : organizations.organizations || [];
+  // Prefer the organization used by the current page, then try the remaining
+  // memberships. Some accounts expose both a personal and a team org.
+  const pathMatch = location.pathname.match(/organizations\/([0-9a-f-]{20,})/i);
+  const pathOrg = pathMatch ? pathMatch[1] : null;
+  const ids = [...new Set([
+    pathOrg,
+    ...list.map(org => org.uuid || org.id || org.organization_uuid)
+  ].filter(Boolean))];
+  for (const id of ids) {
+    try {
+      const payload = UsageParsers.parseClaude(await fetchJson(`/api/organizations/${encodeURIComponent(id)}/usage`));
+      if (payload) return payload;
+    } catch (_) {}
+  }
+  return null;
+}
+
+let publishing = false;
+async function publish() {
+  if (publishing) return;
+  publishing = true;
   const text = normalizedText();
-  const payload = location.hostname.includes("claude.ai") ? extractClaude(text) : extractChatGPT(text);
-  if (!payload) return;
-  Object.values(payload.windows).forEach(item => { if (item.used === null) delete item.used; if (!item.reset_label) delete item.reset_label; });
-  // Chrome can reload or suspend the service worker while a usage page stays open.
-  // A failed one-way update must not create a visible extension error.
   try {
-    const sent = chrome.runtime.sendMessage({ type: "usage-update", payload });
-    if (sent && typeof sent.catch === "function") sent.catch(() => {});
-  } catch (_) {}
+    const payload = await fetchClaudeUsage() || extractClaude(text);
+    if (!payload) return;
+    Object.values(payload.windows).forEach(item => {
+      if (item.used === null || item.used === undefined) delete item.used;
+      if (!item.reset_label) delete item.reset_label;
+    });
+    // Chrome can reload or suspend the service worker while a usage page stays open.
+    // A failed one-way update must not create a visible extension error.
+    try {
+      const sent = chrome.runtime.sendMessage({ type: "usage-update", payload });
+      if (sent && typeof sent.catch === "function") sent.catch(() => {});
+    } catch (_) {}
+  } finally {
+    publishing = false;
+  }
 }
 let debounce;
-new MutationObserver(() => { clearTimeout(debounce); debounce = setTimeout(publish, 800); }).observe(document.documentElement, { childList: true, subtree: true, characterData: true });
-publish(); setInterval(publish, 30000);
+new MutationObserver(() => { clearTimeout(debounce); debounce = setTimeout(() => publish(), 800); }).observe(document.documentElement, { childList: true, subtree: true, characterData: true });
+publish(); setInterval(() => publish(), 30000);

@@ -2,17 +2,15 @@
 // usage percentages/reset labels to the desktop widget's localhost listener.
 const LOCAL_RECEIVER = "http://127.0.0.1:8765/usage";
 const USAGE_URLS = {
-  Claude: "https://claude.ai/settings/usage",
-  ChatGPT: "https://chatgpt.com/codex/settings/usage"
+  Claude: "https://claude.ai/new"
 };
 const OFFSCREEN_PATH = "refresh-monitor.html";
-const CHATGPT_ALARM = "chatgpt-usage-refresh";
 let pendingTabId = null;
 let pendingWindowId = null;
 let pendingProvider = null;
 let creatingWindow = false;
 const queuedProviders = new Set();
-const FALLBACK_CLOSE_MS = { Claude: 30000, ChatGPT: 8000 };
+const FALLBACK_CLOSE_MS = { Claude: 15000 };
 
 async function widgetStatus() {
   try {
@@ -89,16 +87,12 @@ async function ensureRefreshMonitor() {
 }
 
 function installPeriodicRefresh() {
-  // Chrome alarms cannot run faster than once a minute. The offscreen page
-  // handles Claude every 30 seconds; this alarm refreshes ChatGPT every minute.
-  chrome.alarms.create(CHATGPT_ALARM, { periodInMinutes: 1 });
+  // The offscreen page asks for a Claude refresh every 30 seconds. ChatGPT is
+  // read locally through the Codex app server by the desktop widget.
   ensureRefreshMonitor().catch(() => {});
 }
 chrome.runtime.onInstalled.addListener(installPeriodicRefresh);
 chrome.runtime.onStartup.addListener(installPeriodicRefresh);
-chrome.alarms.onAlarm.addListener(alarm => {
-  if (alarm.name === CHATGPT_ALARM) requestRefresh("ChatGPT");
-});
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   if (tabId !== pendingTabId || changeInfo.status !== "complete") return;
