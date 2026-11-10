@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "AI Usage Widget Companion",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Locally syncs ChatGPT and Claude usage limits to the desktop widget.",
   "permissions": ["storage", "tabs", "windows", "offscreen"],
   "background": {"service_worker": "background.js"},

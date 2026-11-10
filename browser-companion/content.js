@@ -42,8 +42,10 @@ async function fetchClaudeUsage() {
   // memberships. Some accounts expose both a personal and a team org.
   const pathMatch = location.pathname.match(/organizations\/([0-9a-f-]{20,})/i);
   const pathOrg = pathMatch ? pathMatch[1] : null;
+  const chatOrganizations = list.filter(org => Array.isArray(org.capabilities) && org.capabilities.includes("chat"));
   const ids = [...new Set([
     pathOrg,
+    ...chatOrganizations.map(org => org.uuid || org.id || org.organization_uuid),
     ...list.map(org => org.uuid || org.id || org.organization_uuid)
   ].filter(Boolean))];
   for (const id of ids) {

@@ -159,17 +159,17 @@ class App:
         native_css = Gtk.CssProvider()
         native_css.load_from_data(b'window, webview, webkitwebview { background-color: rgba(0, 0, 0, 0); }')
         Gtk.StyleContext.add_provider_for_screen(screen, native_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
-        self.codex_refresh_running=False
+        self.codex_refresh_running=False; self.claude_refresh_running=False
         self.web=WebKit2.WebView(); self.web.set_background_color(Gdk.RGBA(0,0,0,0)); self.web.add_events(Gdk.EventMask.BUTTON_PRESS_MASK); self.window.add(self.web); self.web.connect('notify::title',self.title); self.web.connect('button-press-event',self.press); self.window.connect('destroy',Gtk.main_quit)
         base_uri = Path(__file__).resolve().parent.as_uri() + '/'
-        self.web.load_html(html(), base_uri); self.window.show_all(); ACTIVE_APP = self; GLib.timeout_add(1000,self.tick); GLib.timeout_add_seconds(60,self.periodic_codex_refresh); GLib.idle_add(self.startup_refresh)
+        self.web.load_html(html(), base_uri); self.window.show_all(); ACTIVE_APP = self; GLib.timeout_add(1000,self.tick); GLib.timeout_add_seconds(60,self.periodic_local_refresh); GLib.idle_add(self.startup_refresh)
     def startup_refresh(self):
         # Sync both providers once at launch.  Further hover/click/alarm syncs
         # are deliberately ignored for 30 seconds to avoid duplicate refreshes.
-        request_provider_refresh('Claude', force=True); self.refresh_codex()
+        request_provider_refresh('Claude', force=True); self.refresh_codex(); self.refresh_claude_local()
         return False
-    def periodic_codex_refresh(self):
-        self.refresh_codex()
+    def periodic_local_refresh(self):
+        self.refresh_codex(); self.refresh_claude_local()
         return True
     def title(self, view, _):
         title = view.get_title() or ''
@@ -235,6 +235,13 @@ class App:
         def run_refresh():
             try: subprocess.run([sys.executable, str(Path(__file__).with_name('codex_usage_sync.py')), '--once'], check=False)
             finally: self.codex_refresh_running=False
+        threading.Thread(target=run_refresh, daemon=True).start()
+    def refresh_claude_local(self):
+        if self.claude_refresh_running: return
+        self.claude_refresh_running=True
+        def run_refresh():
+            try: subprocess.run([sys.executable, str(Path(__file__).with_name('claude_usage_sync.py'))], check=False)
+            finally: self.claude_refresh_running=False
         threading.Thread(target=run_refresh, daemon=True).start()
 
 if __name__=='__main__':

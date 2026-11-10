@@ -49,7 +49,7 @@ The companion has access only to `claude.ai` and the widget's localhost listener
 ## How updates work
 
 - ChatGPT/Codex refreshes at launch and every minute through the installed desktop app's `account/rateLimits/read` service. The app handles its own authentication, so the widget does not read or store account tokens.
-- Claude refreshes at launch and every 30 seconds through the Chrome companion and the existing `claude.ai` browser session.
+- Claude refreshes at launch and every 30 seconds through the Chrome companion and the existing `claude.ai` browser session. If Chrome does not deliver a response, the widget falls back to the newest plan-usage sample maintained by Claude Desktop.
 - Response windows are classified by duration, so weekly-only plans and providers that reorder their returned windows do not show stale values.
 - A limit omitted by the provider is displayed as unavailable instead of retaining an old percentage.
 
@@ -62,6 +62,8 @@ If Codex is installed somewhere other than the standard ChatGPT desktop location
 - `browser-companion/` — the Claude-only Chrome extension and response parser.
 - `codex_usage_sync.py` — reads ChatGPT/Codex limits from the installed app's local authenticated service.
 - `codex_usage_sync_test.py` — regression tests for reordered and weekly-only Codex limit responses.
+- `claude_usage_sync.py` — freshness-aware fallback for Claude Desktop's local plan-usage history.
+- `claude_usage_sync_test.py` — regression tests for Claude history selection and browser-data precedence.
 - `install-linux-app.sh` — installs the desktop launcher and icon for the current user.
 
 ## Privacy
@@ -71,8 +73,8 @@ The Claude companion sends only the provider name, usage percentage, and display
 ## Development checks
 
 ```bash
-python3 -m unittest -v codex_usage_sync_test.py
-python3 -m py_compile webview_widget.py codex_usage_sync.py
+python3 -m unittest -v codex_usage_sync_test.py claude_usage_sync_test.py
+python3 -m py_compile webview_widget.py codex_usage_sync.py claude_usage_sync.py
 node browser-companion/usage-parsers.test.js
 for file in browser-companion/{background,content,refresh-monitor,usage-parsers}.js; do node --check "$file"; done
 ```

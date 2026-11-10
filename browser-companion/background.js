@@ -2,7 +2,7 @@
 // usage percentages/reset labels to the desktop widget's localhost listener.
 const LOCAL_RECEIVER = "http://127.0.0.1:8765/usage";
 const USAGE_URLS = {
-  Claude: "https://claude.ai/new"
+  Claude: "https://claude.ai/settings/usage"
 };
 const OFFSCREEN_PATH = "refresh-monitor.html";
 let pendingTabId = null;
@@ -10,7 +10,7 @@ let pendingWindowId = null;
 let pendingProvider = null;
 let creatingWindow = false;
 const queuedProviders = new Set();
-const FALLBACK_CLOSE_MS = { Claude: 15000 };
+const FALLBACK_CLOSE_MS = { Claude: 30000 };
 
 async function widgetStatus() {
   try {
